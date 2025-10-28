@@ -1,0 +1,221 @@
+esphome:
+  name: ESP32
+  friendly_name: ESP32 по русски
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "..."
+
+ota:
+  - platform: esphome
+    password: "..."
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Fallback Hotspot"
+    password: "..."
+
+captive_portal:
+
+# Получаем время из сети
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Moscow
+    servers:
+     - 0.pool.ntp.org
+     - 1.pool.ntp.org
+     - 2.pool.ntp.org
+
+# Получаем время из HA
+  - platform: homeassistant
+    id: ntp
+    #timezone: Europe/Moscow
+    
+i2c:
+  sda: GPIO21 # GPIO4 для esp8266
+  scl: GPIO22 # GPIO5 для esp8266
+  scan: true
+  id: bus_a
+
+# DS18B20
+one_wire:
+  - platform: gpio
+    pin: GPIO23
+    id: one_wire_bus
+
+# Датчики 
+sensor:
+  - platform: aht10
+    variant: aht20
+    temperature:
+      name: aht20_temperature
+      id: aht20_temperature
+      unit_of_measurement: "℃"
+      icon: mdi:thermometer
+      accuracy_decimals: 1
+      filters:
+      - filter_out: 0.0
+      - median:
+          window_size: 3
+          send_every: 3
+          send_first_at: 1
+    humidity:
+      name: aht20_humidity
+      id: aht20_humidity
+      unit_of_measurement: "%"
+      icon: mdi:water-percent
+      accuracy_decimals: 0
+      filters:
+      - filter_out: 0.0
+      - median:
+          window_size: 3
+          send_every: 3
+          send_first_at: 1
+    update_interval: 5s
+    
+  - platform: bmp280_i2c
+    temperature:
+      name: bmp280_temperature
+      id: bmp280_temperature
+      unit_of_measurement: "℃"
+      icon: mdi:thermometer
+      accuracy_decimals: 1
+    pressure:
+      name: bmp280_pressure
+      id: bmp280_pressure
+      unit_of_measurement: "mmHg"
+      icon: mdi:cloud
+      accuracy_decimals: 0
+      filters:
+        - multiply: 0.750062
+    update_interval: 5s
+  
+  - platform: bh1750
+    name: bh1750_illuminance
+    id: bh1750_illuminance
+    unit_of_measurement: "LX"
+    icon: mdi:lightbulb-on
+    address: 0x23
+    accuracy_decimals: 0
+    update_interval: 5s
+
+# DS18B20
+  - platform: dallas_temp
+    address: 0x095c6ad4436cef28
+    name: ds18b20_temperature
+    id: ds18b20_temperature
+    unit_of_measurement: "℃"
+    icon: mdi:sun-thermometer
+    accuracy_decimals: 1
+    update_interval: 5s # 60s по умолчанию
+    filters:
+      - round: 2 # округление до 2 десятичных знаков
+      - offset: 0.05 # Смещение после 10 точек измерения вверх
+
+# Диммер
+output:
+  - platform: ledc
+    pin: GPIO19
+    id: gpio_19
+    frequency: "144Hz"
+    min_power: 0
+    max_power: 1
+
+light:
+  - platform: monochromatic
+    output: gpio_19
+    name: dimmer_light
+    id: dimmer_light
+    # restore_mode: RESTORE_DEFAULT_OFF # возможно это лишнее
+    icon: mdi:lightbulb-on
+
+# Реле
+switch:
+  - platform: gpio
+    name: relay_light
+    id: relay_light
+    pin: GPIO27
+    icon: mdi:lightbulb-on
+    inverted: true
+    restore_mode: RESTORE_DEFAULT_OFF # директива которая делает сбой более безопасным!!! 
+
+# ВКЛ/ОТКЛ освещение
+datetime: 
+  - platform: template
+    type: time
+    name: light_morning_on
+    id: light_morning_on
+    optimistic: yes
+    initial_value: "06:30:00"
+    restore_value: true
+    icon: mdi:lightbulb-on
+
+  - platform: template
+    type: time
+    name: light_morning_off
+    id: light_morning_off
+    optimistic: yes
+    initial_value: "09:30:00"
+    restore_value: true
+    icon: mdi:lightbulb-off
+     
+  - platform: template
+    type: time
+    name: light_evening_on
+    id: light_evening_on
+    optimistic: yes
+    initial_value: "19:30:00"
+    restore_value: true
+    icon: mdi:lightbulb-on
+
+  - platform: template
+    type: time
+    name: light_evening_off
+    id: light_evening_off
+    optimistic: yes
+    initial_value: "21:30:00"
+    restore_value: true
+    icon: mdi:lightbulb-off 
+
+# Объекты WEB интерфейса для интеграции в HA
+number: 
+  # Установка температуры светильника с датчиком DS18B20
+  - platform: template
+    name: light_tmp_min
+    id: light_tmp_min
+    optimistic: true
+    unit_of_measurement: "℃"
+    icon: mdi:thermometer-low
+    min_value: 24
+    max_value: 37.5
+    step: 0.5
+    initial_value: 37.5
+    restore_value: true
+    mode: box
+
+  - platform: template
+    name: light_tmp_max
+    id: light_tmp_max
+    optimistic: true
+    unit_of_measurement: "℃"
+    icon: mdi:thermometer-high
+    min_value: 38
+    max_value: 50
+    step: 0.5
+    initial_value: 38
+    restore_value: true
+    mode: box
